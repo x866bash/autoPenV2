@@ -236,6 +236,15 @@
             color: #721c24;
         }
 
+        .sqlmap-result {
+            background: #e8f4fd;
+            border-left-color: #17a2b8;
+        }
+
+        .sqlmap-result h4 {
+            color: #0c5460;
+        }
+
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -285,6 +294,12 @@
             border-radius: 8px;
             border: 1px solid #dee2e6;
             text-align: center;
+            position: relative;
+        }
+
+        .service-card.attacking {
+            background: #fff3cd;
+            border-color: #ffc107;
         }
 
         .loading {
@@ -326,6 +341,12 @@
             color: #0c5460;
         }
 
+        .alert-success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
         .reporting-section {
             background: #e8f5e8;
             border: 1px solid #c3e6c3;
@@ -346,6 +367,46 @@
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
+        }
+
+        .bruteforce-status {
+            background: #e8f4fd;
+            border: 1px solid #bee5eb;
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+
+        .bruteforce-progress {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .progress-text {
+            font-size: 14px;
+            color: #495057;
+        }
+
+        .wordlist-info {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 10px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #6c757d;
+        }
+
+        .sqlmap-details {
+            background: #f8f9fa;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            max-height: 300px;
+            overflow-y: auto;
         }
 
         @media (max-width: 768px) {
@@ -371,7 +432,7 @@
     <div class="container">
         <div class="header">
             <h1>🔒 Scanner Keamanan Domain Otomatis</h1>
-            <p>Platform pentesting otomatis dengan teknologi Hydra untuk brute force login</p>
+            <p>Platform pentesting otomatis dengan teknologi Hydra bruteforce user dan password</p>
         </div>
 
         <div class="alert alert-warning">
@@ -395,6 +456,7 @@
                             <option value="port">Port Scan (Nmap)</option>
                             <option value="subdomain">Subdomain Enumeration</option>
                             <option value="vulnerability">Vulnerability Scan</option>
+                            <option value="sqlmap">SQLMap Attack (SQL Injection ada di autoPenV3)</option>
                         </select>
                     </div>
                     
@@ -424,12 +486,22 @@
             <div class="bruteforce-section">
                 <h3>🔓 Brute Force Login Attack (Hydra)</h3>
                 <div class="alert alert-info">
-                    <strong>ℹ️ Info:</strong> Fitur ini akan mencoba kombinasi username/password umum pada layanan yang terdeteksi.
+                    <strong>ℹ️ Info:</strong> Fitur ini akan mencoba kombinasi username/password dari SecLists pada layanan yang terdeteksi.
                     Proses ini dapat memakan waktu beberapa menit.
                 </div>
                 
                 <div class="service-grid" id="serviceGrid">
                     <!-- Services will be populated here -->
+                </div>
+
+                <!-- Brute Force Status Display -->
+                <div id="bruteforceStatusContainer" style="display: none;">
+                    <div class="bruteforce-status">
+                        <h4>🔄 Status Brute Force Attack</h4>
+                        <div id="bruteforceStatusList">
+                            <!-- Active brute force attacks will be shown here -->
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -474,6 +546,10 @@
         let currentScanId = null;
         let scanInterval = null;
         let currentScanResults = null;
+        let activeBruteforceAttacks = {};
+
+        // Use the correct API base URL for port 8001
+        const API_BASE = window.location.origin.replace(':8000', ':8001');
 
         document.getElementById('scanForm').addEventListener('submit', async (e) => {
             e.preventDefault();
@@ -481,12 +557,14 @@
             const target = document.getElementById('target').value;
             const scanType = document.getElementById('scanType').value;
             
+            console.log('Starting scan for:', target, 'Type:', scanType);
+            
             // Show loading state
             document.getElementById('scanButtonText').style.display = 'none';
             document.getElementById('scanLoading').style.display = 'inline-block';
             
             try {
-                const response = await fetch('/api/v1/scan', {
+                const response = await fetch(`${API_BASE}/api/v1/scan`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -498,6 +576,7 @@
                 });
                 
                 const result = await response.json();
+                console.log('Scan started:', result);
                 
                 if (response.ok) {
                     currentScanId = result.scan_id;
@@ -507,6 +586,7 @@
                     alert('Error: ' + result.detail);
                 }
             } catch (error) {
+                console.error('Scan error:', error);
                 alert('Error: ' + error.message);
             } finally {
                 // Reset button state
@@ -522,17 +602,19 @@
                 if (!currentScanId) return;
                 
                 try {
-                    const response = await fetch(`/api/v1/scan/${currentScanId}/status`);
+                    const response = await fetch(`${API_BASE}/api/v1/scan/${currentScanId}/status`);
                     const data = await response.json();
                     
+                    console.log('Scan status:', data);
                     updateScanStatus(data);
                     
                     if (data.status === 'completed' || data.status === 'failed') {
                         clearInterval(scanInterval);
                         if (data.status === 'completed') {
                             // Get full results
-                            const resultsResponse = await fetch(`/api/v1/scan/${currentScanId}/results`);
+                            const resultsResponse = await fetch(`${API_BASE}/api/v1/scan/${currentScanId}/results`);
                             const fullResults = await resultsResponse.json();
+                            console.log('Full results:', fullResults);
                             currentScanResults = fullResults;
                             
                             displayResults(fullResults.results);
@@ -573,6 +655,7 @@
         }
 
         function displayResults(results) {
+            console.log('Displaying results:', results);
             const resultsCard = document.getElementById('resultsCard');
             const resultsContainer = document.getElementById('scanResults');
             
@@ -582,12 +665,15 @@
             // Display different types of results
             Object.keys(results).forEach(key => {
                 const result = results[key];
+                console.log('Processing result:', key, result);
+                
                 if (!result || typeof result !== 'object') return;
                 
                 const resultElement = document.createElement('div');
                 resultElement.className = 'result-item';
                 
                 if (key === 'nmap_scan' && result.open_ports) {
+                    console.log('Found nmap_scan with open_ports:', result.open_ports);
                     resultElement.innerHTML = `
                         <h4>🔍 Port Scan (Nmap)</h4>
                         <p><strong>Status:</strong> ${result.status}</p>
@@ -621,6 +707,34 @@
                         <p><strong>Security Score:</strong> ${Math.round(result.security_score || 0)}%</p>
                         <p><strong>Missing Headers:</strong> ${result.missing_headers ? result.missing_headers.join(', ') : 'None'}</p>
                     `;
+                } else if (key === 'sqlmap_attack') {
+                    resultElement.className += ' sqlmap-result';
+                    resultElement.innerHTML = `
+                        <h4>💉 SQLMap Attack Results</h4>
+                        <p><strong>Status:</strong> ${result.status}</p>
+                        <p><strong>Target:</strong> ${result.target}</p>
+                        <p><strong>Subdomains Found:</strong> ${result.subdomains_found || 0}</p>
+                        <p><strong>Alive Domains:</strong> ${result.alive_domains || 0}</p>
+                        <p><strong>URLs Collected:</strong> ${result.urls_collected || 0}</p>
+                        <p><strong>Parameter URLs:</strong> ${result.param_urls || 0}</p>
+                        <p><strong>SQL Vulnerabilities:</strong> ${result.sqli_vulnerabilities?.vulnerabilities_found || 0}</p>
+                        ${result.credentials_found?.plaintext_passwords?.length > 0 ? 
+                            `<div class="alert alert-success">
+                                <strong>🔑 Credentials Found:</strong>
+                                <ul>
+                                    ${result.credentials_found.plaintext_passwords.map(cred => 
+                                        `<li><strong>${cred.username}:${cred.password}</strong></li>`
+                                    ).join('')}
+                                </ul>
+                            </div>` : ''
+                        }
+                        ${result.workflow_summary ? 
+                            `<div class="sqlmap-details">
+                                <strong>📋 Detailed Report:</strong><br>
+                                <pre>${result.workflow_summary}</pre>
+                            </div>` : ''
+                        }
+                    `;
                 }
                 
                 if (resultElement.innerHTML) {
@@ -629,8 +743,8 @@
             });
             
             // Display brute force results if any
-            if (results.bruteforce_results) {
-                results.bruteforce_results.forEach(bf => {
+            if (currentScanResults.brute_force_results) {
+                currentScanResults.brute_force_results.forEach(bf => {
                     const bfElement = document.createElement('div');
                     bfElement.className = 'result-item credential-found';
                     
@@ -642,12 +756,22 @@
                             <ul>
                                 ${bf.credentials_found.map(cred => `<li><strong>${cred.username}:${cred.password}</strong></li>`).join('')}
                             </ul>
+                            <div class="wordlist-info">
+                                <strong>Wordlist Source:</strong> ${bf.wordlist_source || 'SecLists (danielmiessler)'}<br>
+                                <strong>Usernames Tested:</strong> ${bf.usernames_tested || 'N/A'} | 
+                                <strong>Passwords Tested:</strong> ${bf.passwords_tested || 'N/A'}
+                            </div>
                         `;
                     } else {
                         bfElement.innerHTML = `
                             <h4>🔓 Brute Force Results - ${bf.service.toUpperCase()}:${bf.port}</h4>
                             <p><strong>Status:</strong> ${bf.status}</p>
-                            <p>No credentials found with common username/password combinations.</p>
+                            <p>No credentials found with SecLists wordlists.</p>
+                            <div class="wordlist-info">
+                                <strong>Wordlist Source:</strong> ${bf.wordlist_source || 'SecLists (danielmiessler)'}<br>
+                                <strong>Usernames Tested:</strong> ${bf.usernames_tested || 'N/A'} | 
+                                <strong>Passwords Tested:</strong> ${bf.passwords_tested || 'N/A'}
+                            </div>
                         `;
                     }
                     
@@ -657,17 +781,62 @@
         }
 
         function showBruteforceOptions(results) {
+            console.log('=== BRUTE FORCE DEBUG ===');
+            console.log('Checking brute force options for results:', results);
             const bruteforceSection = document.getElementById('bruteforceSection');
             const serviceGrid = document.getElementById('serviceGrid');
             
-            // Extract open ports from nmap scan
-            let openPorts = [];
-            if (results.nmap_scan && results.nmap_scan.open_ports) {
-                openPorts = results.nmap_scan.open_ports;
+            // Only show brute force section for port scans or full scans
+            if (!results.nmap_scan && !results.sqlmap_attack) {
+                return;
             }
             
+            bruteforceSection.style.display = 'block';
+            
+            // Extract open ports from nmap scan
+            let openPorts = [];
+            
+            // Check multiple possible locations for open ports
+            if (results.nmap_scan && results.nmap_scan.open_ports) {
+                openPorts = results.nmap_scan.open_ports;
+                console.log('✅ Found open ports in nmap_scan:', openPorts);
+            } else if (results.nmap && results.nmap.open_ports) {
+                openPorts = results.nmap.open_ports;
+                console.log('✅ Found open ports in nmap:', openPorts);
+            } else if (results.port_scan && results.port_scan.open_ports) {
+                openPorts = results.port_scan.open_ports;
+                console.log('✅ Found open ports in port_scan:', openPorts);
+            } else {
+                console.log('❌ No structured open ports found, trying to parse raw output...');
+                // Try to parse from nmap output if available
+                const nmapOutput = results.nmap_scan?.output || results.nmap_scan?.raw_output || results.nmap?.output || results.nmap;
+                console.log('Raw nmap output:', nmapOutput);
+                
+                if (typeof nmapOutput === 'string' && nmapOutput.includes('open')) {
+                    console.log('🔍 Parsing nmap output for open ports...');
+                    const lines = nmapOutput.split('\n');
+                    for (const line of lines) {
+                        if (line.includes('/tcp') && line.includes('open')) {
+                            console.log('Found open port line:', line);
+                            const parts = line.trim().split(/\s+/);
+                            const portPart = parts[0];
+                            const servicePart = parts.length > 2 ? parts[2] : 'unknown';
+                            const portNum = parseInt(portPart.split('/')[0]);
+                            if (!isNaN(portNum)) {
+                                openPorts.push({ port: portNum, service: servicePart });
+                                console.log('✅ Parsed port:', portNum, 'service:', servicePart);
+                            }
+                        }
+                    }
+                    console.log('✅ Total parsed open ports:', openPorts);
+                } else {
+                    console.log('❌ No parseable nmap output found');
+                }
+            }
+            
+            console.log('Final open ports for brute force:', openPorts);
+            
             if (openPorts.length > 0) {
-                bruteforceSection.style.display = 'block';
                 serviceGrid.innerHTML = '';
                 
                 // Common services that support brute force
@@ -683,21 +852,49 @@
                     3306: 'mysql'
                 };
                 
+                let servicesFound = 0;
                 openPorts.forEach(port => {
+                    console.log('Checking port:', port.port, 'Service mapping:', supportedServices[port.port]);
                     if (supportedServices[port.port]) {
+                        servicesFound++;
                         const serviceCard = document.createElement('div');
                         serviceCard.className = 'service-card';
+                        serviceCard.id = `service-${port.port}`;
                         serviceCard.innerHTML = `
                             <h4>${supportedServices[port.port].toUpperCase()}</h4>
                             <p>Port: ${port.port}</p>
-                            <button class="btn btn-secondary" onclick="startBruteforce('${supportedServices[port.port]}', ${port.port})">
+                            <button class="btn btn-danger btn-sm" onclick="startBruteforce('${supportedServices[port.port]}', ${port.port})">
                                 🔓 Brute Force
                             </button>
+                            <div class="wordlist-info">
+                                Menggunakan wordlist dari SecLists
+                            </div>
                         `;
                         serviceGrid.appendChild(serviceCard);
+                        console.log('✅ Created service card for:', supportedServices[port.port], 'on port', port.port);
                     }
                 });
+                
+                console.log(`✅ Created ${servicesFound} brute force service cards`);
+                
+                if (servicesFound === 0) {
+                    serviceGrid.innerHTML = '<div class="alert alert-warning">Tidak ada layanan yang mendukung brute force ditemukan pada port yang terbuka.</div>';
+                    console.log('⚠️ No supported services found for brute force');
+                }
+            } else {
+                console.log('❌ No open ports found, showing debug info');
+                // Show debug info
+                serviceGrid.innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>🔍 Debug Info:</strong><br>
+                        No open ports detected for brute force.<br>
+                        <strong>Available results keys:</strong> ${Object.keys(results).join(', ')}<br>
+                        <strong>Raw results:</strong><br>
+                        <pre style="font-size: 11px; max-height: 200px; overflow-y: auto;">${JSON.stringify(results, null, 2)}</pre>
+                    </div>
+                `;
             }
+            console.log('=== END BRUTE FORCE DEBUG ===');
         }
 
         function showReportingSection() {
@@ -705,6 +902,140 @@
             reportingSection.style.display = 'block';
         }
 
+        function updateBruteforceStatus(service, port, status, progress = null) {
+            const serviceCard = document.getElementById(`service-${port}`);
+            const statusContainer = document.getElementById('bruteforceStatusContainer');
+            const statusList = document.getElementById('bruteforceStatusList');
+            
+            if (status === 'running') {
+                // Update service card
+                if (serviceCard) {
+                    serviceCard.classList.add('attacking');
+                    serviceCard.innerHTML = `
+                        <h4>${service.toUpperCase()}</h4>
+                        <p>Port: ${port}</p>
+                        <div class="bruteforce-progress">
+                            <div class="loading"></div>
+                            <span class="progress-text">Attacking...</span>
+                        </div>
+                        <div class="wordlist-info">
+                            Menggunakan wordlist dari SecLists
+                        </div>
+                    `;
+                }
+                
+                // Show status container
+                statusContainer.style.display = 'block';
+                
+                // Add to status list
+                const statusItem = document.createElement('div');
+                statusItem.id = `status-${port}`;
+                statusItem.innerHTML = `
+                    <div class="alert alert-info">
+                        <strong>🔄 ${service.toUpperCase()}:${port}</strong> - Brute force attack sedang berjalan...
+                        <div class="bruteforce-progress">
+                            <div class="loading"></div>
+                            <span class="progress-text">Testing credentials from SecLists...</span>
+                        </div>
+                    </div>
+                `;
+                statusList.appendChild(statusItem);
+                
+            } else if (status === 'completed' || status === 'failed') {
+                // Update service card
+                if (serviceCard) {
+                    serviceCard.classList.remove('attacking');
+                    const statusClass = status === 'completed' ? 'success' : 'danger';
+                    const statusText = status === 'completed' ? 'Selesai' : 'Gagal';
+                    serviceCard.innerHTML = `
+                        <h4>${service.toUpperCase()}</h4>
+                        <p>Port: ${port}</p>
+                        <div class="alert alert-${statusClass}">
+                            ${statusText}
+                        </div>
+                        <div class="wordlist-info">
+                            Wordlist dari SecLists telah digunakan
+                        </div>
+                    `;
+                }
+                
+                // Remove from status list
+                const statusItem = document.getElementById(`status-${port}`);
+                if (statusItem) {
+                    statusItem.remove();
+                }
+                
+                // Hide status container if no more active attacks
+                if (statusList.children.length === 0) {
+                    statusContainer.style.display = 'none';
+                }
+            }
+        }
+
+        async function startBruteforce(service, port) {
+            if (!currentScanId) {
+                alert('No active scan found');
+                return;
+            }
+            
+            console.log('Starting brute force:', service, port);
+            
+            try {
+                updateBruteforceStatus(service, port, 'running');
+                
+                const response = await fetch(`${API_BASE}/api/v1/scan/${currentScanId}/bruteforce?service=${service}&port=${port}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                console.log('Brute force started:', result);
+                
+                if (response.ok) {
+                    // Start polling for brute force results
+                    activeBruteforceAttacks[`${service}:${port}`] = true;
+                    pollBruteforceResults(service, port);
+                } else {
+                    updateBruteforceStatus(service, port, 'failed');
+                    alert('Error: ' + result.detail);
+                }
+            } catch (error) {
+                console.error('Brute force error:', error);
+                updateBruteforceStatus(service, port, 'failed');
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function pollBruteforceResults(service, port) {
+            const pollInterval = setInterval(async () => {
+                if (!activeBruteforceAttacks[`${service}:${port}`]) {
+                    clearInterval(pollInterval);
+                    return;
+                }
+                
+                try {
+                    const response = await fetch(`${API_BASE}/api/v1/scan/${currentScanId}/results`);
+                    const data = await response.json();
+                    
+                    if (data.brute_force_results) {
+                        const bfResult = data.brute_force_results.find(bf => 
+                            bf.service === service && bf.port === port
+                        );
+                        
+                        if (bfResult && (bfResult.status === 'completed' || bfResult.status === 'failed')) {
+                            activeBruteforceAttacks[`${service}:${port}`] = false;
+                            updateBruteforceStatus(service, port, bfResult.status);
+                            currentScanResults = data;
+                            displayResults(data.results);
+                            clearInterval(pollInterval);
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error polling brute force results:', error);
+                }
+            }, 3000);
+        }
+
+        // Export functions
         function exportResults(format) {
             if (!currentScanResults) {
                 alert('Tidak ada hasil scan untuk diekspor');
@@ -761,58 +1092,29 @@
                 report += '\n';
             }
 
-            // Subdomain Results
-            if (data.results.subdomain_enum) {
-                report += '🌐 SUBDOMAIN ENUMERATION\n';
+            // SQLMap Results
+            if (data.results.sqlmap_attack) {
+                report += '💉 SQLMAP ATTACK RESULTS\n';
                 report += '-'.repeat(40) + '\n';
-                report += `Status: ${data.results.subdomain_enum.status}\n`;
-                if (data.results.subdomain_enum.subdomains) {
-                    report += `Subdomain Ditemukan: ${data.results.subdomain_enum.count}\n\n`;
-                    data.results.subdomain_enum.subdomains.forEach(sub => {
-                        report += `  - ${sub}\n`;
-                    });
-                }
-                report += '\n';
+                report += data.results.sqlmap_attack.workflow_summary || 'No detailed summary available';
+                report += '\n\n';
             }
 
-            // Vulnerability Results
-            if (data.results.vulnerability_scan) {
-                report += '🚨 VULNERABILITY SCAN\n';
-                report += '-'.repeat(40) + '\n';
-                report += `Status: ${data.results.vulnerability_scan.status}\n`;
-                if (data.results.vulnerability_scan.vulnerabilities) {
-                    report += `Vulnerabilities: ${data.results.vulnerability_scan.count}\n\n`;
-                    data.results.vulnerability_scan.vulnerabilities.forEach(vuln => {
-                        report += `  - ${vuln}\n`;
-                    });
-                }
-                report += '\n';
-            }
-
-            // Security Headers
-            if (data.results.security_headers) {
-                report += '🛡️ SECURITY HEADERS\n';
-                report += '-'.repeat(40) + '\n';
-                report += `Status: ${data.results.security_headers.status}\n`;
-                report += `Security Score: ${Math.round(data.results.security_headers.security_score || 0)}%\n`;
-                if (data.results.security_headers.missing_headers) {
-                    report += `Missing Headers: ${data.results.security_headers.missing_headers.join(', ')}\n`;
-                }
-                report += '\n';
-            }
-
-            // Brute Force Results
+            // Add brute force results
             if (data.brute_force_results && data.brute_force_results.length > 0) {
-                report += '🔓 BRUTE FORCE RESULTS\n';
+                report += '🔓 BRUTE FORCE RESULTS (SecLists)\n';
                 report += '-'.repeat(40) + '\n';
                 data.brute_force_results.forEach(bf => {
                     report += `Service: ${bf.service.toUpperCase()}:${bf.port}\n`;
                     report += `Status: ${bf.status}\n`;
-                    if (bf.result && bf.result.credentials_found) {
-                        report += `Credentials Found: ${bf.result.count || 0}\n`;
-                        bf.result.credentials_found.forEach(cred => {
+                    report += `Wordlist Source: ${bf.wordlist_source || 'SecLists'}\n`;
+                    if (bf.credentials_found && bf.credentials_found.length > 0) {
+                        report += `Credentials Found: ${bf.credentials_found.length}\n`;
+                        bf.credentials_found.forEach(cred => {
                             report += `  - ${cred.username}:${cred.password}\n`;
                         });
+                    } else {
+                        report += 'No credentials found\n';
                     }
                     report += '\n';
                 });
@@ -820,43 +1122,38 @@
 
             report += '='.repeat(60) + '\n';
             report += 'Report generated by Scanner Keamanan Domain Otomatis\n';
+            report += 'Wordlists powered by SecLists (danielmiessler)\n';
             report += '='.repeat(60) + '\n';
 
             return report;
         }
 
         function generateCsvReport(data) {
-            let csv = 'Type,Service,Port,Status,Details,Timestamp\n';
+            let csv = 'Type,Service,Port,Status,Details,Wordlist_Source,Timestamp\n';
             const timestamp = new Date().toISOString();
 
             // Port Scan Results
             if (data.results.nmap_scan && data.results.nmap_scan.open_ports) {
                 data.results.nmap_scan.open_ports.forEach(port => {
-                    csv += `"Port Scan","${port.service}","${port.port}","Open","Port ${port.port} is open","${timestamp}"\n`;
+                    csv += `"Port Scan","${port.service}","${port.port}","Open","Port ${port.port} is open","N/A","${timestamp}"\n`;
                 });
             }
 
-            // Subdomain Results
-            if (data.results.subdomain_enum && data.results.subdomain_enum.subdomains) {
-                data.results.subdomain_enum.subdomains.forEach(sub => {
-                    csv += `"Subdomain","${sub}","","Found","Subdomain discovered","${timestamp}"\n`;
-                });
-            }
-
-            // Vulnerability Results
-            if (data.results.vulnerability_scan && data.results.vulnerability_scan.vulnerabilities) {
-                data.results.vulnerability_scan.vulnerabilities.forEach(vuln => {
-                    csv += `"Vulnerability","","","Found","${vuln.replace(/"/g, '""')}","${timestamp}"\n`;
-                });
+            // SQLMap Results
+            if (data.results.sqlmap_attack) {
+                const sqlmap = data.results.sqlmap_attack;
+                csv += `"SQLMap Attack","SQL Injection","N/A","${sqlmap.status}","${sqlmap.sqli_vulnerabilities?.vulnerabilities_found || 0} vulnerabilities found","SecLists","${timestamp}"\n`;
             }
 
             // Brute Force Results
             if (data.brute_force_results) {
                 data.brute_force_results.forEach(bf => {
-                    if (bf.result && bf.result.credentials_found) {
-                        bf.result.credentials_found.forEach(cred => {
-                            csv += `"Brute Force","${bf.service}","${bf.port}","Success","${cred.username}:${cred.password}","${timestamp}"\n`;
+                    if (bf.credentials_found && bf.credentials_found.length > 0) {
+                        bf.credentials_found.forEach(cred => {
+                            csv += `"Brute Force","${bf.service}","${bf.port}","Success","${cred.username}:${cred.password}","${bf.wordlist_source || 'SecLists'}","${timestamp}"\n`;
                         });
+                    } else {
+                        csv += `"Brute Force","${bf.service}","${bf.port}","No Results","No credentials found","${bf.wordlist_source || 'SecLists'}","${timestamp}"\n`;
                     }
                 });
             }
@@ -900,52 +1197,9 @@
             printWindow.print();
         }
 
-        async function startBruteforce(service, port) {
-            if (!currentScanId) {
-                alert('No active scan found');
-                return;
-            }
-            
-            try {
-                const response = await fetch(`/api/v1/scan/${currentScanId}/bruteforce?service=${service}&port=${port}`, {
-                    method: 'POST'
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    alert(`Brute force attack started for ${service} on port ${port}`);
-                    // Start polling for brute force results
-                    setTimeout(() => {
-                        checkBruteforceResults();
-                    }, 5000);
-                } else {
-                    alert('Error: ' + result.detail);
-                }
-            } catch (error) {
-                alert('Error: ' + error.message);
-            }
-        }
-
-        async function checkBruteforceResults() {
-            if (!currentScanId) return;
-            
-            try {
-                const response = await fetch(`/api/v1/scan/${currentScanId}/results`);
-                const data = await response.json();
-                
-                if (data.brute_force_results) {
-                    currentScanResults = data;
-                    displayResults(data.results);
-                }
-            } catch (error) {
-                console.error('Error checking brute force results:', error);
-            }
-        }
-
         async function updateScanHistory() {
             try {
-                const response = await fetch('/api/v1/scans');
+                const response = await fetch(`${API_BASE}/api/v1/scans`);
                 const data = await response.json();
                 
                 const historyElement = document.getElementById('scanHistory');
@@ -974,7 +1228,7 @@
         async function deleteScan(scanId) {
             if (confirm('Are you sure you want to delete this scan?')) {
                 try {
-                    const response = await fetch(`/api/v1/scan/${scanId}`, {
+                    const response = await fetch(`${API_BASE}/api/v1/scan/${scanId}`, {
                         method: 'DELETE'
                     });
                     

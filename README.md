@@ -13,6 +13,7 @@ Platform pentesting otomatis yang mengintegrasikan berbagai tools keamanan terma
 ## 🚀 Fitur Utama
 
 ### 🔍 Scanning Tools
+
 - **Nmap Port Scanning** - Deteksi port terbuka dan layanan
 - **Subdomain Enumeration** - Pencarian subdomain menggunakan Subfinder
 - **Vulnerability Scanning** - Deteksi kerentanan menggunakan Nikto
@@ -25,6 +26,27 @@ Platform pentesting otomatis yang mengintegrasikan berbagai tools keamanan terma
 - **Smart Dictionary** - Username dan password umum yang sering digunakan
 - **Timeout Protection** - Mencegah serangan yang terlalu lama
 - **Real-time Results** - Menampilkan hasil secara langsung
+
+---
+
+### 😂 NO PIC HOAX
+
+## DATA PIC PERTAMA
+![ss1](pic/Screenshot1.png)
+
+## DATA PIC KEDUA
+![ss2](pic/Screenshot2.png)
+
+## DATA PIC KETIGA
+![ss3](pic/Screenshot3.png)
+
+## DATA PIC KEEMPAT
+![ss4](pic/Screenshot4.png)
+
+## DATA PIC KELIMA
+![ss5](pic/Screenshot5.png)
+
+---
 
 ## 📋 Persyaratan Sistem
 

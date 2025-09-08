@@ -1,38 +1,54 @@
 from fastapi import APIRouter, HTTPException, BackgroundTasks
-from app.schemas.scan import ScanRequest, ScanResponse
+from pydantic import BaseModel
+from typing import Dict, Any, Optional
+import uuid
+import asyncio
+from datetime import datetime
+
 from app.services.scanner import SecurityScanner
 from app.services.tools import run_hydra_bruteforce
-import asyncio
-import uuid
-from typing import Dict, Any
 
 router = APIRouter()
 
-# Store scan results in memory (in production, use a database)
-scan_results: Dict[str, Dict[str, Any]] = {}
+# In-memory storage for scan results (in production, use a database)
+scan_storage = {}
+
+class ScanRequest(BaseModel):
+    target: str
+    scan_type: str = "full"
+
+class ScanResponse(BaseModel):
+    scan_id: str
+    status: str
+    message: str
 
 @router.post("/scan", response_model=ScanResponse)
 async def start_scan(scan_request: ScanRequest, background_tasks: BackgroundTasks):
-    """Start a security scan on the target domain"""
+    """Start a security scan"""
     scan_id = str(uuid.uuid4())
     
-    # Initialize scan result
-    scan_results[scan_id] = {
-        "status": "running",
+    # Initialize scan record
+    scan_storage[scan_id] = {
+        "scan_id": scan_id,
         "target": scan_request.target,
         "scan_type": scan_request.scan_type,
+        "status": "running",
+        "started_at": datetime.now().isoformat(),
         "results": {},
-        "open_ports": [],
         "brute_force_results": []
     }
     
     # Start scan in background
-    background_tasks.add_task(run_scan, scan_id, scan_request.target, scan_request.scan_type)
+    background_tasks.add_task(run_scan_task, scan_id, scan_request.target, scan_request.scan_type)
     
-    return ScanResponse(scan_id=scan_id, status="started", message="Scan initiated successfully")
+    return ScanResponse(
+        scan_id=scan_id,
+        status="started",
+        message=f"Scan started for {scan_request.target}"
+    )
 
-async def run_scan(scan_id: str, target: str, scan_type: str):
-    """Run the actual security scan"""
+async def run_scan_task(scan_id: str, target: str, scan_type: str):
+    """Background task to run the actual scan"""
     try:
         scanner = SecurityScanner()
         
@@ -47,117 +63,128 @@ async def run_scan(scan_id: str, target: str, scan_type: str):
         else:
             results = {"error": "Invalid scan type"}
         
-        # Extract open ports for brute force
-        open_ports = []
-        if "nmap" in results:
-            nmap_output = results["nmap"]
-            if "open" in nmap_output.lower():
-                # Parse open ports from nmap output
-                lines = nmap_output.split('\n')
-                for line in lines:
-                    if "/tcp" in line and "open" in line:
-                        port = line.split('/')[0].strip()
-                        service = line.split()[-1] if len(line.split()) > 2 else "unknown"
-                        try:
-                            port_num = int(port)
-                            open_ports.append({"port": port_num, "service": service})
-                        except ValueError:
-                            continue
-        
-        scan_results[scan_id].update({
-            "status": "completed",
-            "results": results,
-            "open_ports": open_ports
-        })
+        # Update scan record
+        scan_storage[scan_id]["results"] = results
+        scan_storage[scan_id]["status"] = "completed"
+        scan_storage[scan_id]["completed_at"] = datetime.now().isoformat()
         
     except Exception as e:
-        scan_results[scan_id].update({
-            "status": "failed",
-            "error": str(e)
-        })
+        scan_storage[scan_id]["status"] = "failed"
+        scan_storage[scan_id]["error"] = str(e)
+        scan_storage[scan_id]["completed_at"] = datetime.now().isoformat()
 
 @router.get("/scan/{scan_id}/status")
 async def get_scan_status(scan_id: str):
-    """Get the status of a scan"""
-    if scan_id not in scan_results:
+    """Get scan status"""
+    if scan_id not in scan_storage:
         raise HTTPException(status_code=404, detail="Scan not found")
     
-    result = scan_results[scan_id]
+    scan_data = scan_storage[scan_id]
     return {
         "scan_id": scan_id,
-        "status": result["status"],
-        "target": result["target"],
-        "scan_type": result["scan_type"]
+        "target": scan_data["target"],
+        "scan_type": scan_data["scan_type"],
+        "status": scan_data["status"],
+        "started_at": scan_data.get("started_at"),
+        "completed_at": scan_data.get("completed_at")
     }
 
 @router.get("/scan/{scan_id}/results")
 async def get_scan_results(scan_id: str):
-    """Get the results of a completed scan"""
-    if scan_id not in scan_results:
+    """Get scan results"""
+    if scan_id not in scan_storage:
         raise HTTPException(status_code=404, detail="Scan not found")
     
-    return scan_results[scan_id]
+    return scan_storage[scan_id]
 
 @router.post("/scan/{scan_id}/bruteforce")
-async def start_bruteforce(scan_id: str, background_tasks: BackgroundTasks, service: str = "ssh", port: int = 22):
+async def start_bruteforce(scan_id: str, service: str, port: int, background_tasks: BackgroundTasks):
     """Start brute force attack on a specific service"""
-    if scan_id not in scan_results:
+    if scan_id not in scan_storage:
         raise HTTPException(status_code=404, detail="Scan not found")
     
-    scan_data = scan_results[scan_id]
+    scan_data = scan_storage[scan_id]
     target = scan_data["target"]
     
     # Start brute force in background
-    background_tasks.add_task(run_bruteforce, scan_id, target, service, port)
+    background_tasks.add_task(run_bruteforce_task, scan_id, target, service, port)
     
-    return {"message": f"Brute force attack started on {service}:{port}", "scan_id": scan_id}
+    return {
+        "message": f"Brute force attack started on {service}:{port}",
+        "target": target,
+        "service": service,
+        "port": port
+    }
 
-async def run_bruteforce(scan_id: str, target: str, service: str, port: int):
-    """Run brute force attack"""
+async def run_bruteforce_task(scan_id: str, target: str, service: str, port: int):
+    """Background task to run brute force attack"""
     try:
-        # Update status
-        scan_results[scan_id]["brute_force_status"] = "running"
-        
-        # Run Hydra brute force
+        # Run brute force attack
         result = await run_hydra_bruteforce(target, service, port)
         
-        # Store results
-        if scan_id in scan_results:
-            if "brute_force_results" not in scan_results[scan_id]:
-                scan_results[scan_id]["brute_force_results"] = []
-            
-            scan_results[scan_id]["brute_force_results"].append({
-                "service": service,
-                "port": port,
-                "result": result,
-                "status": "completed"
-            })
-            scan_results[scan_id]["brute_force_status"] = "completed"
+        # Add result to scan storage
+        scan_storage[scan_id]["brute_force_results"].append(result)
         
     except Exception as e:
-        if scan_id in scan_results:
-            scan_results[scan_id]["brute_force_status"] = "failed"
-            scan_results[scan_id]["brute_force_error"] = str(e)
+        # Add failed result
+        scan_storage[scan_id]["brute_force_results"].append({
+            "service": service,
+            "port": port,
+            "target": target,
+            "status": "failed",
+            "error": str(e),
+            "credentials_found": [],
+            "count": 0
+        })
 
-@router.get("/scan/{scan_id}/bruteforce")
-async def get_bruteforce_results(scan_id: str):
-    """Get brute force results"""
-    if scan_id not in scan_results:
-        raise HTTPException(status_code=404, detail="Scan not found")
+@router.get("/scans")
+async def get_all_scans():
+    """Get all scans"""
+    scans = []
+    for scan_id, scan_data in scan_storage.items():
+        scans.append({
+            "scan_id": scan_id,
+            "target": scan_data["target"],
+            "scan_type": scan_data["scan_type"],
+            "status": scan_data["status"],
+            "started_at": scan_data.get("started_at"),
+            "completed_at": scan_data.get("completed_at")
+        })
     
-    scan_data = scan_results[scan_id]
-    return {
-        "scan_id": scan_id,
-        "brute_force_status": scan_data.get("brute_force_status", "not_started"),
-        "brute_force_results": scan_data.get("brute_force_results", []),
-        "brute_force_error": scan_data.get("brute_force_error")
-    }
+    return {"scans": scans}
 
 @router.delete("/scan/{scan_id}")
 async def delete_scan(scan_id: str):
-    """Delete a scan and its results"""
-    if scan_id not in scan_results:
+    """Delete a scan"""
+    if scan_id not in scan_storage:
         raise HTTPException(status_code=404, detail="Scan not found")
     
-    del scan_results[scan_id]
+    del scan_storage[scan_id]
     return {"message": "Scan deleted successfully"}
+
+@router.get("/scan/{scan_id}/export/{format}")
+async def export_scan_results(scan_id: str, format: str):
+    """Export scan results in different formats"""
+    if scan_id not in scan_storage:
+        raise HTTPException(status_code=404, detail="Scan not found")
+    
+    scan_data = scan_storage[scan_id]
+    
+    if format == "json":
+        return scan_data
+    elif format == "txt":
+        # Generate text report
+        report = f"Scan Report for {scan_data['target']}\n"
+        report += f"Status: {scan_data['status']}\n"
+        report += f"Started: {scan_data.get('started_at', 'N/A')}\n"
+        report += f"Completed: {scan_data.get('completed_at', 'N/A')}\n\n"
+        
+        # Add results
+        if scan_data.get('results'):
+            report += "Results:\n"
+            for key, value in scan_data['results'].items():
+                report += f"- {key}: {value}\n"
+        
+        return {"content": report, "filename": f"scan_report_{scan_id}.txt"}
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported format")

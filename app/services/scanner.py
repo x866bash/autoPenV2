@@ -2,6 +2,10 @@ import asyncio
 import subprocess
 from typing import Dict, Any, List
 from app.services.tools import SecurityTools
+import logging
+import re
+
+logger = logging.getLogger(__name__)
 
 class SecurityScanner:
     def __init__(self):
@@ -17,9 +21,12 @@ class SecurityScanner:
             results['nmap_scan'] = {
                 'status': 'completed',
                 'raw_output': nmap_result,
+                'output': nmap_result,  # Add both for compatibility
                 'open_ports': self._parse_nmap_ports(nmap_result)
             }
+            logger.info(f"Full scan nmap result: {len(results['nmap_scan']['open_ports'])} ports found")
         except Exception as e:
+            logger.error(f"Nmap scan failed: {str(e)}")
             results['nmap_scan'] = {
                 'status': 'failed',
                 'error': str(e)
@@ -68,15 +75,24 @@ class SecurityScanner:
     async def port_scan(self, target: str) -> Dict[str, Any]:
         """Run port scan only"""
         try:
+            logger.info(f"Starting port scan for target: {target}")
             nmap_result = await self.tools.run_nmap_scan(target)
+            open_ports = self._parse_nmap_ports(nmap_result)
+            
+            logger.info(f"Port scan completed. Found {len(open_ports)} open ports")
+            for port in open_ports:
+                logger.info(f"Open port: {port['port']} ({port['service']})")
+            
             return {
                 'nmap_scan': {
                     'status': 'completed',
                     'raw_output': nmap_result,
-                    'open_ports': self._parse_nmap_ports(nmap_result)
+                    'output': nmap_result,  # Add both for compatibility
+                    'open_ports': open_ports
                 }
             }
         except Exception as e:
+            logger.error(f"Port scan failed: {str(e)}")
             return {
                 'nmap_scan': {
                     'status': 'failed',
@@ -126,31 +142,81 @@ class SecurityScanner:
             }
     
     def _parse_nmap_ports(self, nmap_output: str) -> List[Dict[str, Any]]:
-        """Parse Nmap output to extract open ports"""
+        """Enhanced Nmap output parser to extract open ports"""
         open_ports = []
         
         if not nmap_output:
+            logger.warning("Empty nmap output received")
             return open_ports
         
+        logger.info("Parsing nmap output...")
+        logger.debug(f"Nmap output:\n{nmap_output}")
+        
         lines = nmap_output.split('\n')
-        for line in lines:
+        for line_num, line in enumerate(lines, 1):
+            line = line.strip()
+            
+            # Look for lines containing port information
+            # Format: PORT     STATE SERVICE
+            # Example: 22/tcp   open  ssh
+            # Example: 80/tcp   open  http
+            # Example: 443/tcp  open  https
+            
             if '/tcp' in line and 'open' in line:
-                parts = line.split()
+                logger.debug(f"Line {line_num}: Found potential port line: {line}")
+                
+                # Split by whitespace and filter empty strings
+                parts = [part for part in line.split() if part]
+                
                 if len(parts) >= 3:
-                    port_info = parts[0]
-                    state = parts[1]
-                    service = parts[2] if len(parts) > 2 else 'unknown'
+                    port_info = parts[0]  # e.g., "22/tcp"
+                    state = parts[1]      # e.g., "open"
+                    service = parts[2]    # e.g., "ssh"
                     
-                    if '/' in port_info:
-                        port_num = port_info.split('/')[0]
+                    logger.debug(f"Parsed parts: port_info={port_info}, state={state}, service={service}")
+                    
+                    # Extract port number
+                    if '/' in port_info and state.lower() == 'open':
                         try:
-                            port_int = int(port_num)
-                            open_ports.append({
-                                'port': port_int,
+                            port_num = int(port_info.split('/')[0])
+                            
+                            port_entry = {
+                                'port': port_num,
                                 'state': state,
                                 'service': service
-                            })
-                        except ValueError:
+                            }
+                            
+                            open_ports.append(port_entry)
+                            logger.info(f"Added open port: {port_num} ({service})")
+                            
+                        except ValueError as e:
+                            logger.warning(f"Failed to parse port number from '{port_info}': {e}")
                             continue
+                else:
+                    logger.debug(f"Line has insufficient parts ({len(parts)}): {line}")
+            
+            # Also try regex pattern matching as fallback
+            elif re.search(r'\d+/tcp.*open', line, re.IGNORECASE):
+                logger.debug(f"Line {line_num}: Regex matched port line: {line}")
+                
+                # Use regex to extract port, state, and service
+                match = re.match(r'(\d+)/tcp\s+(\w+)\s+(\w+)', line)
+                if match:
+                    port_num = int(match.group(1))
+                    state = match.group(2)
+                    service = match.group(3)
+                    
+                    if state.lower() == 'open':
+                        port_entry = {
+                            'port': port_num,
+                            'state': state,
+                            'service': service
+                        }
+                        
+                        # Avoid duplicates
+                        if not any(p['port'] == port_num for p in open_ports):
+                            open_ports.append(port_entry)
+                            logger.info(f"Added open port (regex): {port_num} ({service})")
         
+        logger.info(f"Total open ports found: {len(open_ports)}")
         return open_ports
