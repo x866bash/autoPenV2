@@ -1,0 +1,996 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scanner Keamanan Domain Otomatis</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+
+        .header p {
+            font-size: 1.1rem;
+            opacity: 0.9;
+        }
+
+        .card {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .scan-form {
+            display: grid;
+            gap: 20px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+        }
+
+        .form-group input, .form-group select {
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #f8f9fa;
+            color: #495057;
+            border: 2px solid #dee2e6;
+        }
+
+        .btn-secondary:hover {
+            background: #e9ecef;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        .btn-info {
+            background: #17a2b8;
+            color: white;
+        }
+
+        .btn-info:hover {
+            background: #138496;
+        }
+
+        .btn-warning {
+            background: #ffc107;
+            color: #212529;
+        }
+
+        .btn-warning:hover {
+            background: #e0a800;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover {
+            background: #c82333;
+        }
+
+        .btn-sm {
+            padding: 8px 16px;
+            font-size: 14px;
+        }
+
+        .progress-container {
+            margin: 20px 0;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .status {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-running {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .status-completed {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-failed {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .results-container {
+            margin-top: 20px;
+        }
+
+        .result-item {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 10px;
+            border-radius: 0 8px 8px 0;
+        }
+
+        .result-item h4 {
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+
+        .credential-found {
+            background: #fff3cd;
+            border-left-color: #ffc107;
+            border: 1px solid #ffeaa7;
+        }
+
+        .credential-found h4 {
+            color: #856404;
+        }
+
+        .vulnerability {
+            background: #f8d7da;
+            border-left-color: #dc3545;
+        }
+
+        .vulnerability h4 {
+            color: #721c24;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .scan-history {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .scan-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .scan-item:last-child {
+            border-bottom: none;
+        }
+
+        .bruteforce-section {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .bruteforce-section h3 {
+            color: #856404;
+            margin-bottom: 15px;
+        }
+
+        .service-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .service-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 1px solid #dee2e6;
+            text-align: center;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+
+        .alert-warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .alert-danger {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+
+        .alert-info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+
+        .reporting-section {
+            background: #e8f5e8;
+            border: 1px solid #c3e6c3;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+
+        .reporting-section h3 {
+            color: #155724;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+
+            .export-buttons {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔒 Scanner Keamanan Domain Otomatis</h1>
+            <p>Platform pentesting otomatis dengan teknologi Hydra untuk brute force login</p>
+        </div>
+
+        <div class="alert alert-warning">
+            <strong>⚠️ Peringatan:</strong> Tool ini hanya untuk tujuan edukasi dan pengujian pada sistem yang Anda miliki. 
+            Penggunaan pada sistem tanpa izin adalah ilegal dan dapat melanggar hukum.
+        </div>
+
+        <div class="grid">
+            <div class="card">
+                <h2>🎯 Mulai Scan Keamanan</h2>
+                <form class="scan-form" id="scanForm">
+                    <div class="form-group">
+                        <label for="target">Target Domain/IP:</label>
+                        <input type="text" id="target" name="target" placeholder="example.com atau 192.168.1.1" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="scanType">Tipe Scan:</label>
+                        <select id="scanType" name="scanType">
+                            <option value="full">Full Scan (Lengkap)</option>
+                            <option value="port">Port Scan (Nmap)</option>
+                            <option value="subdomain">Subdomain Enumeration</option>
+                            <option value="vulnerability">Vulnerability Scan</option>
+                        </select>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">
+                        <span id="scanButtonText">🚀 Mulai Scan</span>
+                        <span id="scanLoading" class="loading" style="display: none;"></span>
+                    </button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>📊 Status Scan</h2>
+                <div id="scanStatus">
+                    <p>Belum ada scan yang berjalan</p>
+                </div>
+                
+                <div id="progressContainer" class="progress-container" style="display: none;">
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill" style="width: 0%"></div>
+                    </div>
+                    <p id="progressText">0%</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="bruteforceSection" style="display: none;">
+            <div class="bruteforce-section">
+                <h3>🔓 Brute Force Login Attack (Hydra)</h3>
+                <div class="alert alert-info">
+                    <strong>ℹ️ Info:</strong> Fitur ini akan mencoba kombinasi username/password umum pada layanan yang terdeteksi.
+                    Proses ini dapat memakan waktu beberapa menit.
+                </div>
+                
+                <div class="service-grid" id="serviceGrid">
+                    <!-- Services will be populated here -->
+                </div>
+            </div>
+        </div>
+
+        <div class="card" id="resultsCard" style="display: none;">
+            <h2>📋 Hasil Scan</h2>
+            <div id="scanResults" class="results-container">
+                <!-- Results will be populated here -->
+            </div>
+
+            <!-- Reporting Section -->
+            <div class="reporting-section" id="reportingSection" style="display: none;">
+                <h3>📄 Reporting & Export</h3>
+                <p style="margin-bottom: 15px;">Simpan hasil scanning dalam berbagai format untuk dokumentasi dan analisis lebih lanjut:</p>
+                
+                <div class="export-buttons">
+                    <button class="btn btn-success btn-sm" onclick="exportResults('txt')">
+                        📄 Export TXT
+                    </button>
+                    <button class="btn btn-info btn-sm" onclick="exportResults('csv')">
+                        📊 Export CSV
+                    </button>
+                    <button class="btn btn-warning btn-sm" onclick="exportResults('json')">
+                        🔧 Export JSON
+                    </button>
+                    <button class="btn btn-secondary btn-sm" onclick="printResults()">
+                        🖨️ Print Report
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📚 Riwayat Scan</h2>
+            <div id="scanHistory" class="scan-history">
+                <p>Belum ada riwayat scan</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentScanId = null;
+        let scanInterval = null;
+        let currentScanResults = null;
+
+        document.getElementById('scanForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const target = document.getElementById('target').value;
+            const scanType = document.getElementById('scanType').value;
+            
+            // Show loading state
+            document.getElementById('scanButtonText').style.display = 'none';
+            document.getElementById('scanLoading').style.display = 'inline-block';
+            
+            try {
+                const response = await fetch('/api/v1/scan', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        target: target,
+                        scan_type: scanType
+                    })
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    currentScanId = result.scan_id;
+                    startPolling();
+                    updateScanHistory();
+                } else {
+                    alert('Error: ' + result.detail);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                // Reset button state
+                document.getElementById('scanButtonText').style.display = 'inline';
+                document.getElementById('scanLoading').style.display = 'none';
+            }
+        });
+
+        function startPolling() {
+            if (scanInterval) clearInterval(scanInterval);
+            
+            scanInterval = setInterval(async () => {
+                if (!currentScanId) return;
+                
+                try {
+                    const response = await fetch(`/api/v1/scan/${currentScanId}/status`);
+                    const data = await response.json();
+                    
+                    updateScanStatus(data);
+                    
+                    if (data.status === 'completed' || data.status === 'failed') {
+                        clearInterval(scanInterval);
+                        if (data.status === 'completed') {
+                            // Get full results
+                            const resultsResponse = await fetch(`/api/v1/scan/${currentScanId}/results`);
+                            const fullResults = await resultsResponse.json();
+                            currentScanResults = fullResults;
+                            
+                            displayResults(fullResults.results);
+                            showBruteforceOptions(fullResults.results);
+                            showReportingSection();
+                        }
+                        updateScanHistory();
+                    }
+                } catch (error) {
+                    console.error('Polling error:', error);
+                }
+            }, 2000);
+        }
+
+        function updateScanStatus(data) {
+            const statusElement = document.getElementById('scanStatus');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            let statusClass = 'status-running';
+            if (data.status === 'completed') statusClass = 'status-completed';
+            if (data.status === 'failed') statusClass = 'status-failed';
+            
+            statusElement.innerHTML = `
+                <p><strong>Target:</strong> ${data.target}</p>
+                <p><strong>Tipe Scan:</strong> ${data.scan_type}</p>
+                <p><strong>Status:</strong> <span class="status ${statusClass}">${data.status}</span></p>
+            `;
+            
+            if (data.status === 'running') {
+                progressContainer.style.display = 'block';
+                progressFill.style.width = '50%';
+                progressText.textContent = '50%';
+            } else {
+                progressContainer.style.display = 'none';
+            }
+        }
+
+        function displayResults(results) {
+            const resultsCard = document.getElementById('resultsCard');
+            const resultsContainer = document.getElementById('scanResults');
+            
+            resultsCard.style.display = 'block';
+            resultsContainer.innerHTML = '';
+            
+            // Display different types of results
+            Object.keys(results).forEach(key => {
+                const result = results[key];
+                if (!result || typeof result !== 'object') return;
+                
+                const resultElement = document.createElement('div');
+                resultElement.className = 'result-item';
+                
+                if (key === 'nmap_scan' && result.open_ports) {
+                    resultElement.innerHTML = `
+                        <h4>🔍 Port Scan (Nmap)</h4>
+                        <p><strong>Status:</strong> ${result.status}</p>
+                        <p><strong>Port Terbuka:</strong> ${result.open_ports.length}</p>
+                        <ul>
+                            ${result.open_ports.map(port => `<li>Port ${port.port} (${port.service})</li>`).join('')}
+                        </ul>
+                    `;
+                } else if (key === 'subdomain_enum' && result.subdomains) {
+                    resultElement.innerHTML = `
+                        <h4>🌐 Subdomain Enumeration</h4>
+                        <p><strong>Status:</strong> ${result.status}</p>
+                        <p><strong>Subdomain Ditemukan:</strong> ${result.count}</p>
+                        <ul>
+                            ${result.subdomains.slice(0, 10).map(sub => `<li>${sub}</li>`).join('')}
+                            ${result.subdomains.length > 10 ? '<li>... dan lainnya</li>' : ''}
+                        </ul>
+                    `;
+                } else if (key === 'vulnerability_scan') {
+                    resultElement.className += ' vulnerability';
+                    resultElement.innerHTML = `
+                        <h4>🚨 Vulnerability Scan</h4>
+                        <p><strong>Status:</strong> ${result.status}</p>
+                        <p><strong>Vulnerabilities:</strong> ${result.count || 0}</p>
+                        ${result.vulnerabilities ? `<ul>${result.vulnerabilities.slice(0, 5).map(vuln => `<li>${vuln}</li>`).join('')}</ul>` : ''}
+                    `;
+                } else if (key === 'security_headers') {
+                    resultElement.innerHTML = `
+                        <h4>🛡️ Security Headers</h4>
+                        <p><strong>Status:</strong> ${result.status}</p>
+                        <p><strong>Security Score:</strong> ${Math.round(result.security_score || 0)}%</p>
+                        <p><strong>Missing Headers:</strong> ${result.missing_headers ? result.missing_headers.join(', ') : 'None'}</p>
+                    `;
+                }
+                
+                if (resultElement.innerHTML) {
+                    resultsContainer.appendChild(resultElement);
+                }
+            });
+            
+            // Display brute force results if any
+            if (results.bruteforce_results) {
+                results.bruteforce_results.forEach(bf => {
+                    const bfElement = document.createElement('div');
+                    bfElement.className = 'result-item credential-found';
+                    
+                    if (bf.credentials_found && bf.credentials_found.length > 0) {
+                        bfElement.innerHTML = `
+                            <h4>🔓 Brute Force Results - ${bf.service.toUpperCase()}:${bf.port}</h4>
+                            <p><strong>Status:</strong> ${bf.status}</p>
+                            <p><strong>Credentials Found:</strong> ${bf.count}</p>
+                            <ul>
+                                ${bf.credentials_found.map(cred => `<li><strong>${cred.username}:${cred.password}</strong></li>`).join('')}
+                            </ul>
+                        `;
+                    } else {
+                        bfElement.innerHTML = `
+                            <h4>🔓 Brute Force Results - ${bf.service.toUpperCase()}:${bf.port}</h4>
+                            <p><strong>Status:</strong> ${bf.status}</p>
+                            <p>No credentials found with common username/password combinations.</p>
+                        `;
+                    }
+                    
+                    resultsContainer.appendChild(bfElement);
+                });
+            }
+        }
+
+        function showBruteforceOptions(results) {
+            const bruteforceSection = document.getElementById('bruteforceSection');
+            const serviceGrid = document.getElementById('serviceGrid');
+            
+            // Extract open ports from nmap scan
+            let openPorts = [];
+            if (results.nmap_scan && results.nmap_scan.open_ports) {
+                openPorts = results.nmap_scan.open_ports;
+            }
+            
+            if (openPorts.length > 0) {
+                bruteforceSection.style.display = 'block';
+                serviceGrid.innerHTML = '';
+                
+                // Common services that support brute force
+                const supportedServices = {
+                    22: 'ssh',
+                    21: 'ftp',
+                    23: 'telnet',
+                    25: 'smtp',
+                    110: 'pop3',
+                    143: 'imap',
+                    3389: 'rdp',
+                    5432: 'postgres',
+                    3306: 'mysql'
+                };
+                
+                openPorts.forEach(port => {
+                    if (supportedServices[port.port]) {
+                        const serviceCard = document.createElement('div');
+                        serviceCard.className = 'service-card';
+                        serviceCard.innerHTML = `
+                            <h4>${supportedServices[port.port].toUpperCase()}</h4>
+                            <p>Port: ${port.port}</p>
+                            <button class="btn btn-secondary" onclick="startBruteforce('${supportedServices[port.port]}', ${port.port})">
+                                🔓 Brute Force
+                            </button>
+                        `;
+                        serviceGrid.appendChild(serviceCard);
+                    }
+                });
+            }
+        }
+
+        function showReportingSection() {
+            const reportingSection = document.getElementById('reportingSection');
+            reportingSection.style.display = 'block';
+        }
+
+        function exportResults(format) {
+            if (!currentScanResults) {
+                alert('Tidak ada hasil scan untuk diekspor');
+                return;
+            }
+
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const target = currentScanResults.target || 'unknown';
+            const filename = `scan_report_${target}_${timestamp}`;
+
+            let content = '';
+            let mimeType = '';
+
+            switch (format) {
+                case 'txt':
+                    content = generateTxtReport(currentScanResults);
+                    mimeType = 'text/plain';
+                    break;
+                case 'csv':
+                    content = generateCsvReport(currentScanResults);
+                    mimeType = 'text/csv';
+                    break;
+                case 'json':
+                    content = JSON.stringify(currentScanResults, null, 2);
+                    mimeType = 'application/json';
+                    break;
+            }
+
+            downloadFile(content, `${filename}.${format}`, mimeType);
+        }
+
+        function generateTxtReport(data) {
+            let report = '';
+            report += '='.repeat(60) + '\n';
+            report += '           LAPORAN HASIL SECURITY SCAN\n';
+            report += '='.repeat(60) + '\n';
+            report += `Target: ${data.target}\n`;
+            report += `Tipe Scan: ${data.scan_type}\n`;
+            report += `Status: ${data.status}\n`;
+            report += `Waktu Scan: ${new Date().toLocaleString('id-ID')}\n`;
+            report += '='.repeat(60) + '\n\n';
+
+            // Port Scan Results
+            if (data.results.nmap_scan) {
+                report += '📍 PORT SCAN RESULTS (NMAP)\n';
+                report += '-'.repeat(40) + '\n';
+                report += `Status: ${data.results.nmap_scan.status}\n`;
+                if (data.results.nmap_scan.open_ports) {
+                    report += `Port Terbuka: ${data.results.nmap_scan.open_ports.length}\n\n`;
+                    data.results.nmap_scan.open_ports.forEach(port => {
+                        report += `  - Port ${port.port} (${port.service})\n`;
+                    });
+                }
+                report += '\n';
+            }
+
+            // Subdomain Results
+            if (data.results.subdomain_enum) {
+                report += '🌐 SUBDOMAIN ENUMERATION\n';
+                report += '-'.repeat(40) + '\n';
+                report += `Status: ${data.results.subdomain_enum.status}\n`;
+                if (data.results.subdomain_enum.subdomains) {
+                    report += `Subdomain Ditemukan: ${data.results.subdomain_enum.count}\n\n`;
+                    data.results.subdomain_enum.subdomains.forEach(sub => {
+                        report += `  - ${sub}\n`;
+                    });
+                }
+                report += '\n';
+            }
+
+            // Vulnerability Results
+            if (data.results.vulnerability_scan) {
+                report += '🚨 VULNERABILITY SCAN\n';
+                report += '-'.repeat(40) + '\n';
+                report += `Status: ${data.results.vulnerability_scan.status}\n`;
+                if (data.results.vulnerability_scan.vulnerabilities) {
+                    report += `Vulnerabilities: ${data.results.vulnerability_scan.count}\n\n`;
+                    data.results.vulnerability_scan.vulnerabilities.forEach(vuln => {
+                        report += `  - ${vuln}\n`;
+                    });
+                }
+                report += '\n';
+            }
+
+            // Security Headers
+            if (data.results.security_headers) {
+                report += '🛡️ SECURITY HEADERS\n';
+                report += '-'.repeat(40) + '\n';
+                report += `Status: ${data.results.security_headers.status}\n`;
+                report += `Security Score: ${Math.round(data.results.security_headers.security_score || 0)}%\n`;
+                if (data.results.security_headers.missing_headers) {
+                    report += `Missing Headers: ${data.results.security_headers.missing_headers.join(', ')}\n`;
+                }
+                report += '\n';
+            }
+
+            // Brute Force Results
+            if (data.brute_force_results && data.brute_force_results.length > 0) {
+                report += '🔓 BRUTE FORCE RESULTS\n';
+                report += '-'.repeat(40) + '\n';
+                data.brute_force_results.forEach(bf => {
+                    report += `Service: ${bf.service.toUpperCase()}:${bf.port}\n`;
+                    report += `Status: ${bf.status}\n`;
+                    if (bf.result && bf.result.credentials_found) {
+                        report += `Credentials Found: ${bf.result.count || 0}\n`;
+                        bf.result.credentials_found.forEach(cred => {
+                            report += `  - ${cred.username}:${cred.password}\n`;
+                        });
+                    }
+                    report += '\n';
+                });
+            }
+
+            report += '='.repeat(60) + '\n';
+            report += 'Report generated by Scanner Keamanan Domain Otomatis\n';
+            report += '='.repeat(60) + '\n';
+
+            return report;
+        }
+
+        function generateCsvReport(data) {
+            let csv = 'Type,Service,Port,Status,Details,Timestamp\n';
+            const timestamp = new Date().toISOString();
+
+            // Port Scan Results
+            if (data.results.nmap_scan && data.results.nmap_scan.open_ports) {
+                data.results.nmap_scan.open_ports.forEach(port => {
+                    csv += `"Port Scan","${port.service}","${port.port}","Open","Port ${port.port} is open","${timestamp}"\n`;
+                });
+            }
+
+            // Subdomain Results
+            if (data.results.subdomain_enum && data.results.subdomain_enum.subdomains) {
+                data.results.subdomain_enum.subdomains.forEach(sub => {
+                    csv += `"Subdomain","${sub}","","Found","Subdomain discovered","${timestamp}"\n`;
+                });
+            }
+
+            // Vulnerability Results
+            if (data.results.vulnerability_scan && data.results.vulnerability_scan.vulnerabilities) {
+                data.results.vulnerability_scan.vulnerabilities.forEach(vuln => {
+                    csv += `"Vulnerability","","","Found","${vuln.replace(/"/g, '""')}","${timestamp}"\n`;
+                });
+            }
+
+            // Brute Force Results
+            if (data.brute_force_results) {
+                data.brute_force_results.forEach(bf => {
+                    if (bf.result && bf.result.credentials_found) {
+                        bf.result.credentials_found.forEach(cred => {
+                            csv += `"Brute Force","${bf.service}","${bf.port}","Success","${cred.username}:${cred.password}","${timestamp}"\n`;
+                        });
+                    }
+                });
+            }
+
+            return csv;
+        }
+
+        function downloadFile(content, filename, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        }
+
+        function printResults() {
+            if (!currentScanResults) {
+                alert('Tidak ada hasil scan untuk dicetak');
+                return;
+            }
+
+            const printContent = generateTxtReport(currentScanResults);
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Scan Report - ${currentScanResults.target}</title>
+                    <style>
+                        body { font-family: monospace; white-space: pre-wrap; margin: 20px; }
+                        @media print { body { margin: 0; } }
+                    </style>
+                </head>
+                <body>${printContent}</body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        async function startBruteforce(service, port) {
+            if (!currentScanId) {
+                alert('No active scan found');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/v1/scan/${currentScanId}/bruteforce?service=${service}&port=${port}`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    alert(`Brute force attack started for ${service} on port ${port}`);
+                    // Start polling for brute force results
+                    setTimeout(() => {
+                        checkBruteforceResults();
+                    }, 5000);
+                } else {
+                    alert('Error: ' + result.detail);
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        async function checkBruteforceResults() {
+            if (!currentScanId) return;
+            
+            try {
+                const response = await fetch(`/api/v1/scan/${currentScanId}/results`);
+                const data = await response.json();
+                
+                if (data.brute_force_results) {
+                    currentScanResults = data;
+                    displayResults(data.results);
+                }
+            } catch (error) {
+                console.error('Error checking brute force results:', error);
+            }
+        }
+
+        async function updateScanHistory() {
+            try {
+                const response = await fetch('/api/v1/scans');
+                const data = await response.json();
+                
+                const historyElement = document.getElementById('scanHistory');
+                
+                if (data.scans && data.scans.length > 0) {
+                    historyElement.innerHTML = data.scans.map(scan => `
+                        <div class="scan-item">
+                            <div>
+                                <strong>${scan.target}</strong> (${scan.scan_type})
+                                <br>
+                                <small class="status status-${scan.status}">${scan.status}</small>
+                            </div>
+                            <button class="btn btn-danger btn-sm" onclick="deleteScan('${scan.scan_id}')">
+                                🗑️ Delete
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    historyElement.innerHTML = '<p>Belum ada riwayat scan</p>';
+                }
+            } catch (error) {
+                console.error('Error updating scan history:', error);
+            }
+        }
+
+        async function deleteScan(scanId) {
+            if (confirm('Are you sure you want to delete this scan?')) {
+                try {
+                    const response = await fetch(`/api/v1/scan/${scanId}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        updateScanHistory();
+                    } else {
+                        alert('Error deleting scan');
+                    }
+                } catch (error) {
+                    alert('Error: ' + error.message);
+                }
+            }
+        }
+
+        // Load scan history on page load
+        updateScanHistory();
+    </script>
+</body>
+</html>
