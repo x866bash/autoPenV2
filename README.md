@@ -1,3 +1,7 @@
+**PERTAMA TAMA SAYA UCAPKAN TERIMKASIH UNTUK ALLAH YANG MAHA KUASA🙏, YANG SUDAH MEMBERIKAN RAHMAT DAN KECERDASAN BERFIKIR, TANPA ALLAH SAYA TIDAK ADA DI SINI, DAN TERUTAMA ORANG TUA.**
+
+---
+
 # 🔒 Scanner Keamanan Domain Otomatis dengan Hydra
 
 Platform pentesting otomatis yang mengintegrasikan berbagai tools keamanan termasuk **Hydra** untuk brute force login attack. Intinya masih sama kaya [autoPen](https://github.com/x866bash/autoPen) Tapi bedanya cuma aku tambahin hydra, Tool ini dirancang untuk membantu security professionals melakukan penetration testing dengan cara yang terstruktur dan efisien.
@@ -82,6 +86,11 @@ python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 ### 5. Akses Web Interface
 Buka browser dan kunjungi: `http://localhost:8000`
+
+### 6. Matikan Aplikasi
+```bash
+pkill -9 -f uvicorn
+```
 
 ## 📖 Tutorial Penggunaan
 
@@ -348,7 +357,7 @@ Project ini dilisensikan di bawah MIT License. Lihat file [LICENSE](https://gith
 ## 🙏 Acknowledgments
 
 - **Hydra** - [THC-Hydra](https://github.com/vanhauser-thc/thc-hydra) team
-- **Nmap** - Gordon Lyon dan [Nmap](https://nmap.org/) Project
+- **Nmap** - [Gordon Lyon FB](https://www.facebook.com/gordonlyon) dan [Nmap Web](https://nmap.org/) [Nmap Project Github](https://github.com/nmap/nmap)
 - **Subfinder** - [ProjectDiscovery team](https://github.com/projectdiscovery/subfinder)
 - **Nikto** - [CIRT.net](https://cirt.net/nikto2)
 - **FastAPI** - [Sebastián Ramirez](https://de.linkedin.com/in/tiangolo)
